@@ -3,12 +3,13 @@ import os
 import sys
 import asyncio
 from playwright.async_api import async_playwright
+from playwright_stealth import stealth_async
 
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
 RESTAURANTS_FILE = "restaurants.json"
 
 AVAILABLE_TEXT = "このお店を予約する"
-UNAVAILABLE_TEXT = "ご予約可能な枠がありません"
+UNAVAILABLE_TEXT = "ログインして空き枠を確認"
 
 
 def load_restaurants():
@@ -17,6 +18,7 @@ def load_restaurants():
 
 
 def make_reservation_url(url):
+    url = url.replace("/ja/r/", "/r/")
     return url.rstrip("/") + "/reservations/new"
 
 
@@ -47,14 +49,28 @@ async def check_restaurant(page, restaurant):
         page_name = await get_restaurant_name(page)
         name = page_name if page_name else name_fallback
 
-        available = AVAILABLE_TEXT in content
+        has_available_text = AVAILABLE_TEXT in content
+        has_unavailable_text = UNAVAILABLE_TEXT in content
+        available = has_available_text and not has_unavailable_text
+
+        print(f"  → 「{AVAILABLE_TEXT}」: {'あり ✅' if has_available_text else 'なし ❌'}")
+        print(f"  → 「{UNAVAILABLE_TEXT}」: {'あり ✅' if has_unavailable_text else 'なし ❌'}")
+
+        # p-r_reserve_action_reserve の中身をログに出す
+        import re
+        match = re.search(r'(<div class="p-r_reserve_action_reserve">.*?</div>\s*</div>)', content, re.DOTALL)
+        if match:
+            print(f"  → 予約ボタンHTML:\n{match.group(1).strip()}")
+        else:
+            print(f"  → 予約ボタンHTML: 該当箇所が見つかりませんでした")
 
         if available:
-            print(f"  → ✅ 予約可能 ({name})")
-        elif UNAVAILABLE_TEXT in content:
-            print(f"  → ❌ 満席 ({name})")
+            print(f"  → 判定: ✅ 予約可能 ({name})")
+        elif has_unavailable_text:
+            print(f"  → 判定: ❌ 満席 ({name})")
         else:
-            print(f"  → ⚠️ 判定不明 ({name})")
+            print(f"  → 判定: ⚠️ 判定不明 ({name})")
+            print(f"  → HTMLスニペット(1000-2000文字):\n{content[1000:2000]}")
 
         return {"name": name, "url": url, "available": available}
 
@@ -113,6 +129,7 @@ async def main():
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         )
         page = await context.new_page()
+        await stealth_async(page)
 
         for restaurant in restaurants:
             result = await check_restaurant(page, restaurant)
