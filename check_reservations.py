@@ -2,14 +2,13 @@ import json
 import os
 import sys
 import asyncio
-from playwright_stealth import stealth_async
 from playwright.async_api import async_playwright
 
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
 RESTAURANTS_FILE = "restaurants.json"
 
 AVAILABLE_TEXT = "このお店を予約する"
-UNAVAILABLE_TEXT = "ログインして空き枠を確認"
+UNAVAILABLE_TEXT = "ご予約可能な枠がありません"
 
 
 def load_restaurants():
@@ -114,7 +113,6 @@ async def main():
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         )
         page = await context.new_page()
-        await stealth_async(page)
 
         for restaurant in restaurants:
             result = await check_restaurant(page, restaurant)
