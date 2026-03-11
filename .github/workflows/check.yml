@@ -1,0 +1,38 @@
+name: 予約監視
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"  # 10分ごと（GitHubの最小間隔は5分）
+  workflow_dispatch:         # 手動実行も可能
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: status.jsonをキャッシュから復元
+        uses: actions/cache@v4
+        with:
+          path: status.json
+          key: reservation-status-${{ github.run_id }}
+          restore-keys: |
+            reservation-status-
+
+      - name: Pythonセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Playwrightインストール
+        run: |
+          pip install playwright
+          playwright install chromium
+          playwright install-deps chromium
+
+      - name: 予約チェック実行
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: python check_reservations.py
