@@ -6,7 +6,6 @@ from playwright.async_api import async_playwright
 
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
 RESTAURANTS_FILE = "restaurants.json"
-STATUS_FILE = "status.json"
 
 AVAILABLE_TEXT = "このお店を予約する"
 UNAVAILABLE_TEXT = "ご予約可能な枠がありません"
@@ -17,25 +16,11 @@ def load_restaurants():
         return json.load(f)
 
 
-def load_status():
-    if os.path.exists(STATUS_FILE):
-        with open(STATUS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
-
-
-def save_status(status):
-    with open(STATUS_FILE, "w", encoding="utf-8") as f:
-        json.dump(status, f, ensure_ascii=False, indent=2)
-
-
 def make_reservation_url(url):
-    """URLの末尾に /reservations/new を付ける"""
     return url.rstrip("/") + "/reservations/new"
 
 
 async def get_restaurant_name(page):
-    """ページからレストラン名を取得"""
     try:
         el = await page.query_selector("h1")
         if el:
@@ -59,16 +44,14 @@ async def check_restaurant(page, restaurant):
 
         content = await page.content()
 
-        # ページからレストラン名を取得（取れなければJSONの名前を使う）
         page_name = await get_restaurant_name(page)
         name = page_name if page_name else name_fallback
 
         available = AVAILABLE_TEXT in content
-        unavailable = UNAVAILABLE_TEXT in content
 
         if available:
             print(f"  → ✅ 予約可能 ({name})")
-        elif unavailable:
+        elif UNAVAILABLE_TEXT in content:
             print(f"  → ❌ 満席 ({name})")
         else:
             print(f"  → ⚠️ 判定不明 ({name})")
@@ -77,7 +60,7 @@ async def check_restaurant(page, restaurant):
 
     except Exception as e:
         print(f"  → ⚠️ エラー: {e}")
-        return {"name": name_fallback, "url": url, "available": None, "error": str(e)}
+        return {"name": name_fallback, "url": url, "available": False}
 
 
 async def send_slack(name, url):
@@ -91,7 +74,7 @@ async def send_slack(name, url):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"🍽️ *予約可能になりました！*\n\n*レストラン:* {name}\n*URL:* {url}"
+                    "text": f"🍽️ *予約可能です！*\n\n*レストラン:* {name}\n*URL:* {url}"
                 }
             },
             {
@@ -121,8 +104,6 @@ async def send_slack(name, url):
 
 async def main():
     restaurants = load_restaurants()
-    prev_status = load_status()
-    new_status = {}
     notify_list = []
 
     async with async_playwright() as p:
@@ -135,16 +116,10 @@ async def main():
 
         for restaurant in restaurants:
             result = await check_restaurant(page, restaurant)
-            url = result["url"]
-            new_status[url] = result.get("available")
-
-            # 「False/None → True」に変わったときだけ通知
-            if result.get("available") and not prev_status.get(url):
+            if result["available"]:
                 notify_list.append(result)
 
         await browser.close()
-
-    save_status(new_status)
 
     if notify_list:
         if not SLACK_WEBHOOK_URL:
@@ -153,7 +128,7 @@ async def main():
         for r in notify_list:
             await send_slack(r["name"], r["url"])
     else:
-        print("新しく予約可能になったレストランはありません")
+        print("予約可能なレストランはありません")
 
 
 if __name__ == "__main__":
