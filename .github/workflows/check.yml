@@ -2,8 +2,11 @@ name: 予約監視
 
 on:
   schedule:
-    - cron: "*/10 * * * *"  # 10分ごと（GitHubの最小間隔は5分）
-  workflow_dispatch:         # 手動実行も可能
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   check:
