@@ -2,8 +2,8 @@ import json
 import os
 import sys
 import asyncio
+import re
 from playwright.async_api import async_playwright
-from playwright_stealth import stealth_async
 
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
 RESTAURANTS_FILE = "restaurants.json"
@@ -56,8 +56,7 @@ async def check_restaurant(page, restaurant):
         print(f"  → 「{AVAILABLE_TEXT}」: {'あり ✅' if has_available_text else 'なし ❌'}")
         print(f"  → 「{UNAVAILABLE_TEXT}」: {'あり ✅' if has_unavailable_text else 'なし ❌'}")
 
-        # p-r_reserve_action_reserve の中身をログに出す
-        import re
+        # 予約ボタン周辺のHTMLをログに出す
         match = re.search(r'(<div class="p-r_reserve_action_reserve">.*?</div>\s*</div>)', content, re.DOTALL)
         if match:
             print(f"  → 予約ボタンHTML:\n{match.group(1).strip()}")
@@ -123,13 +122,26 @@ async def main():
     notify_list = []
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+            ]
+        )
         context = await browser.new_context(
             locale="ja-JP",
-            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            extra_http_headers={
+                "Accept-Language": "ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            }
         )
+        # webdriverフラグを隠す
+        await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+
         page = await context.new_page()
-        await stealth_async(page)
 
         for restaurant in restaurants:
             result = await check_restaurant(page, restaurant)
