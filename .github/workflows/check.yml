@@ -1,5 +1,11 @@
 name: 予約監視
 
+yaml- name: Playwrightインストール
+  run: |
+    pip install playwright playwright-stealth
+    playwright install chromium
+    playwright install-deps chromium
+
 on:
   schedule:
     - cron: "*/5 * * * *"
