@@ -8,7 +8,7 @@ SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
 RESTAURANTS_FILE = "restaurants.json"
 
 AVAILABLE_TEXT = "このお店を予約する"
-UNAVAILABLE_TEXT = "ご予約可能な枠がありません"
+UNAVAILABLE_TEXT = "ログインして空き枠を確認"
 
 
 def load_restaurants():
