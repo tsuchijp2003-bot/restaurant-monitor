@@ -16,14 +16,6 @@ jobs:
       - name: リポジトリをチェックアウト
         uses: actions/checkout@v4
 
-      - name: status.jsonをキャッシュから復元
-        uses: actions/cache@v4
-        with:
-          path: status.json
-          key: reservation-status-${{ github.run_id }}
-          restore-keys: |
-            reservation-status-
-
       - name: Pythonセットアップ
         uses: actions/setup-python@v5
         with:
