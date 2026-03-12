@@ -29,6 +29,10 @@ async def check_restaurant(session, restaurant):
         response = await session.get(url, timeout=30)
         content = response.text
 
+        print(f"  → HTML取得: {len(content)}文字 / ステータス: {response.status_code}")
+        if len(content) < 5000:
+            print(f"  → HTML全文:\n{content}\n")
+
         # 各テキストが実際にどこにあるか前後100文字を表示
         for label, text in [("予約可能テキスト", AVAILABLE_TEXT), ("予約ボタンクラス", AVAILABLE_BUTTON)]:
             idx = content.find(text)
