@@ -73,7 +73,7 @@ async def send_slack(name, url):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"🍽️ *予約可能です！*\n\n*レストラン:* {name}\n*URL:* {url}"
+                    "text": f"🍽️ *予約可能です！*\n\n*レストラン:* {name}\n*URL:* {reservation_url}"
                 }
             },
             {
