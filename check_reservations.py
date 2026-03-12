@@ -26,7 +26,13 @@ async def check_restaurant(session, restaurant):
     print(f"チェック中: {name} ({url})")
 
     try:
-        response = await session.get(url, timeout=30)
+        response = await session.get(url, timeout=30, headers={
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Referer": "https://www.google.com/",
+            "Upgrade-Insecure-Requests": "1",
+        })
         content = response.text
 
         print(f"  → HTML取得: {len(content)}文字 / ステータス: {response.status_code}")
@@ -107,7 +113,7 @@ async def main():
 
     notify_list = []
 
-    async with AsyncSession(impersonate="chrome120") as session:
+    async with AsyncSession(impersonate="chrome124") as session:
         for restaurant in restaurants:
             result = await check_restaurant(session, restaurant)
             if result["available"]:
