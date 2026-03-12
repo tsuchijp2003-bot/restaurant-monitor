@@ -21,13 +21,11 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Playwrightインストール
-        run: |
-          pip install playwright
-          playwright install chromium
-          playwright install-deps chromium
+      - name: ライブラリインストール
+        run: pip install curl_cffi
 
       - name: 予約チェック実行
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RESTAURANT_URLS: ${{ secrets.RESTAURANT_URLS }}
         run: python check_reservations.py
