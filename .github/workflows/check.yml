@@ -21,8 +21,11 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: ライブラリインストール
-        run: pip install curl_cffi
+      - name: Playwrightインストール
+        run: |
+          pip install playwright
+          playwright install chromium
+          playwright install-deps chromium
 
       - name: 予約チェック実行
         env:
