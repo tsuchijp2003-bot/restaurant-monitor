@@ -51,6 +51,7 @@ async def check_restaurant(session, restaurant):
             print(f"  → 判定: ❌ 満席 ({name})")
         else:
             print(f"  → 判定: ⚠️ 判定不明 ({name})")
+            print(f"  → HTML全体({len(content)}文字)先頭2000文字:\n{content[:2000]}")
 
         return {"name": name, "url": url, "available": available}
 
