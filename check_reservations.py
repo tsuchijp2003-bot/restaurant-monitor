@@ -37,13 +37,13 @@ async def check_restaurant(session, restaurant):
         print(f"  → 「{AVAILABLE_TEXT}」: {'あり ✅' if has_available_text else 'なし ❌'}")
         print(f"  → 「{UNAVAILABLE_TEXT}」: {'あり ✅' if has_unavailable_text else 'なし ❌'}")
 
-        # 予約ボタン周辺のHTMLをログに出す
-        match = re.search(r'(<div class="p-r_reserve_action_reserve">.*?</div>\s*</div>)', content, re.DOTALL)
-        if match:
-            print(f"  → 予約ボタンHTML:\n{match.group(1).strip()}")
-        else:
-            print(f"  → 予約ボタンHTML: 該当箇所が見つかりませんでした")
-            print(f"  → HTMLスニペット(500-1500文字):\n{content[500:1500]}")
+        # 各テキストが実際にどこにあるか前後100文字を表示
+        for label, text in [("予約可能テキスト", AVAILABLE_TEXT), ("満席テキスト", UNAVAILABLE_TEXT)]:
+            idx = content.find(text)
+            if idx != -1:
+                start = max(0, idx - 100)
+                end = min(len(content), idx + len(text) + 100)
+                print(f"  → [{label}] の前後:\n{content[start:end]}\n")
 
         if available:
             print(f"  → 判定: ✅ 予約可能 ({name})")
