@@ -7,6 +7,9 @@ from curl_cffi.requests import AsyncSession
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
 RESTAURANT_URLS = os.environ.get("RESTAURANT_URLS", "[]")
 
+AVAILABLE_BUTTON = 'ui button primary big fluid'
+AVAILABLE_TEXT = "このお店を予約する"
+
 
 def load_restaurants():
     return json.loads(RESTAURANT_URLS)
@@ -26,13 +29,20 @@ async def check_restaurant(session, restaurant):
         response = await session.get(url, timeout=30)
         content = response.text
 
-        # aタグのクラス AND テキストの両方が含まれていれば予約可能
-        has_button = 'ui button primary big fluid' in content
-        has_text = 'このお店を予約する' in content
-        available = has_button and has_text
+        # 各テキストが実際にどこにあるか前後100文字を表示
+        for label, text in [("予約可能テキスト", AVAILABLE_TEXT), ("予約ボタンクラス", AVAILABLE_BUTTON)]:
+            idx = content.find(text)
+            if idx != -1:
+                start = max(0, idx - 100)
+                end = min(len(content), idx + len(text) + 100)
+                print(f"  → [{label}] の前後:\n{content[start:end]}\n")
+            else:
+                print(f"  → [{label}]: 見つかりませんでした")
 
-        print(f"  → 予約ボタン(aタグ): {'あり ✅' if has_button else 'なし ❌'}")
-        print(f"  → 「このお店を予約する」: {'あり ✅' if has_text else 'なし ❌'}")
+        # aタグ(ui button primary big fluid) AND テキスト(このお店を予約する) の両方があれば予約可能
+        has_button = AVAILABLE_BUTTON in content
+        has_text = AVAILABLE_TEXT in content
+        available = has_button and has_text
 
         if available:
             print(f"  → 判定: ✅ 予約可能 ({name})")
