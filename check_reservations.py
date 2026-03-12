@@ -25,38 +25,42 @@ async def check_restaurant(page, restaurant):
     name = restaurant.get("name", url)
     print(f"チェック中: {name} ({url})")
 
-    try:
-        await page.goto(url, timeout=30000, wait_until="domcontentloaded")
-        await page.wait_for_timeout(3000)
-        content = await page.content()
+    content = ""
+    for attempt in range(3):
+        try:
+            await page.goto(url, timeout=30000, wait_until="domcontentloaded")
+            await page.wait_for_timeout(3000)
+            content = await page.content()
+            if len(content) > 10000:
+                break
+            print(f"  → HTML少なすぎ({len(content)}文字)、リトライ {attempt+1}/3...")
+            await asyncio.sleep(5)
+        except Exception as e:
+            print(f"  → ⚠️ エラー(試行{attempt+1}): {e}")
+            await asyncio.sleep(5)
 
-        print(f"  → HTML取得: {len(content)}文字")
+    print(f"  → HTML取得: {len(content)}文字")
 
-        # 各テキストが実際にどこにあるか前後100文字を表示
-        for label, text in [("予約可能テキスト", AVAILABLE_TEXT), ("予約ボタンクラス", AVAILABLE_BUTTON)]:
-            idx = content.find(text)
-            if idx != -1:
-                start = max(0, idx - 100)
-                end = min(len(content), idx + len(text) + 100)
-                print(f"  → [{label}] の前後:\n{content[start:end]}\n")
-            else:
-                print(f"  → [{label}]: 見つかりませんでした")
-
-        # aタグ(ui button primary big fluid) AND テキスト(このお店を予約する) の両方があれば予約可能
-        has_button = AVAILABLE_BUTTON in content
-        has_text = AVAILABLE_TEXT in content
-        available = has_button and has_text
-
-        if available:
-            print(f"  → 判定: ✅ 予約可能 ({name})")
+    # 各テキストが実際にどこにあるか前後100文字を表示
+    for label, text in [("予約可能テキスト", AVAILABLE_TEXT), ("予約ボタンクラス", AVAILABLE_BUTTON)]:
+        idx = content.find(text)
+        if idx != -1:
+            start = max(0, idx - 100)
+            end = min(len(content), idx + len(text) + 100)
+            print(f"  → [{label}] の前後:\n{content[start:end]}\n")
         else:
-            print(f"  → 判定: ❌ 満席 ({name})")
+            print(f"  → [{label}]: 見つかりませんでした")
 
-        return {"name": name, "url": url, "available": available}
+    has_button = AVAILABLE_BUTTON in content
+    has_text = AVAILABLE_TEXT in content
+    available = has_button and has_text
 
-    except Exception as e:
-        print(f"  → ⚠️ エラー: {e}")
-        return {"name": name, "url": url, "available": False}
+    if available:
+        print(f"  → 判定: ✅ 予約可能 ({name})")
+    else:
+        print(f"  → 判定: ❌ 満席 ({name})")
+
+    return {"name": name, "url": url, "available": available}
 
 
 async def send_slack(name, url):
