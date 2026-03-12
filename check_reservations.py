@@ -2,7 +2,7 @@ import json
 import os
 import sys
 import asyncio
-from curl_cffi.requests import AsyncSession
+from playwright.async_api import async_playwright
 
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
 RESTAURANT_URLS = os.environ.get("RESTAURANT_URLS", "[]")
@@ -20,24 +20,17 @@ def make_reservation_url(url):
     return url.rstrip("/") + "/reservations/new"
 
 
-async def check_restaurant(session, restaurant):
+async def check_restaurant(page, restaurant):
     url = restaurant["url"]
     name = restaurant.get("name", url)
     print(f"チェック中: {name} ({url})")
 
     try:
-        response = await session.get(url, timeout=30, headers={
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-            "Accept-Language": "ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Referer": "https://www.google.com/",
-            "Upgrade-Insecure-Requests": "1",
-        })
-        content = response.text
+        await page.goto(url, timeout=30000, wait_until="domcontentloaded")
+        await page.wait_for_timeout(3000)
+        content = await page.content()
 
-        print(f"  → HTML取得: {len(content)}文字 / ステータス: {response.status_code}")
-        if len(content) < 5000:
-            print(f"  → HTML全文:\n{content}\n")
+        print(f"  → HTML取得: {len(content)}文字")
 
         # 各テキストが実際にどこにあるか前後100文字を表示
         for label, text in [("予約可能テキスト", AVAILABLE_TEXT), ("予約ボタンクラス", AVAILABLE_BUTTON)]:
@@ -113,11 +106,24 @@ async def main():
 
     notify_list = []
 
-    async with AsyncSession(impersonate="chrome120") as session:
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=True,
+            args=["--disable-blink-features=AutomationControlled", "--no-sandbox"]
+        )
+        context = await browser.new_context(
+            locale="ja-JP",
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        )
+        await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        page = await context.new_page()
+
         for restaurant in restaurants:
-            result = await check_restaurant(session, restaurant)
+            result = await check_restaurant(page, restaurant)
             if result["available"]:
                 notify_list.append(result)
+
+        await browser.close()
 
     if notify_list:
         if not SLACK_WEBHOOK_URL:
