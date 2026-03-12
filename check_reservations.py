@@ -41,7 +41,6 @@ async def check_restaurant(page, restaurant):
 
     print(f"  → HTML取得: {len(content)}文字")
 
-    # 各テキストが実際にどこにあるか前後100文字を表示
     for label, text in [("予約可能テキスト", AVAILABLE_TEXT), ("予約ボタンクラス", AVAILABLE_BUTTON)]:
         idx = content.find(text)
         if idx != -1:
@@ -115,15 +114,17 @@ async def main():
             headless=True,
             args=["--disable-blink-features=AutomationControlled", "--no-sandbox"]
         )
-        context = await browser.new_context(
-            locale="ja-JP",
-            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        )
-        await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-        page = await context.new_page()
 
         for restaurant in restaurants:
+            # URLごとに新しいコンテキストを作成してCloudflare対策
+            context = await browser.new_context(
+                locale="ja-JP",
+                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            )
+            await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            page = await context.new_page()
             result = await check_restaurant(page, restaurant)
+            await context.close()
             if result["available"]:
                 notify_list.append(result)
 
