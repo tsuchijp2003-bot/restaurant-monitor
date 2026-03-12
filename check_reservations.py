@@ -30,24 +30,19 @@ async def check_restaurant(session, restaurant):
         response = await session.get(url, timeout=30)
         content = response.text
 
-        has_available_text = AVAILABLE_TEXT in content
-        has_unavailable_text = UNAVAILABLE_TEXT in content
-        available = has_available_text and not has_unavailable_text
+        # テキストではなくボタンのHTMLパターンで判定
+        # 予約可能: <a class="ui button primary big fluid" の中に「このお店を予約する」
+        # 満席:     <div class='ui disabled button fluid big'> の中に「ログインして空き枠を確認」
+        has_active_button = 'ui button primary big fluid' in content and AVAILABLE_TEXT in content
+        has_disabled_button = 'ui disabled button fluid big' in content and UNAVAILABLE_TEXT in content
+        available = has_active_button and not has_disabled_button
 
-        print(f"  → 「{AVAILABLE_TEXT}」: {'あり ✅' if has_available_text else 'なし ❌'}")
-        print(f"  → 「{UNAVAILABLE_TEXT}」: {'あり ✅' if has_unavailable_text else 'なし ❌'}")
-
-        # 各テキストが実際にどこにあるか前後100文字を表示
-        for label, text in [("予約可能テキスト", AVAILABLE_TEXT), ("満席テキスト", UNAVAILABLE_TEXT)]:
-            idx = content.find(text)
-            if idx != -1:
-                start = max(0, idx - 100)
-                end = min(len(content), idx + len(text) + 100)
-                print(f"  → [{label}] の前後:\n{content[start:end]}\n")
+        print(f"  → アクティブボタン(予約可能): {'あり ✅' if has_active_button else 'なし ❌'}")
+        print(f"  → 無効ボタン(満席): {'あり ✅' if has_disabled_button else 'なし ❌'}")
 
         if available:
             print(f"  → 判定: ✅ 予約可能 ({name})")
-        elif has_unavailable_text:
+        elif has_disabled_button:
             print(f"  → 判定: ❌ 満席 ({name})")
         else:
             print(f"  → 判定: ⚠️ 判定不明 ({name})")
