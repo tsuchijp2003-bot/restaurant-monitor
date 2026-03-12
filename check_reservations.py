@@ -2,14 +2,10 @@ import json
 import os
 import sys
 import asyncio
-import re
 from curl_cffi.requests import AsyncSession
 
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
 RESTAURANT_URLS = os.environ.get("RESTAURANT_URLS", "[]")
-
-AVAILABLE_TEXT = "このお店を予約する"
-UNAVAILABLE_TEXT = "ログインして空き枠を確認"
 
 
 def load_restaurants():
@@ -30,23 +26,18 @@ async def check_restaurant(session, restaurant):
         response = await session.get(url, timeout=30)
         content = response.text
 
-        # テキストではなくボタンのHTMLパターンで判定
-        # 予約可能: <a class="ui button primary big fluid" の中に「このお店を予約する」
-        # 満席:     <div class='ui disabled button fluid big'> の中に「ログインして空き枠を確認」
-        has_active_button = 'ui button primary big fluid' in content and AVAILABLE_TEXT in content
-        has_disabled_button = 'ui disabled button fluid big' in content and UNAVAILABLE_TEXT in content
-        available = has_active_button and not has_disabled_button
+        # aタグのクラス AND テキストの両方が含まれていれば予約可能
+        has_button = 'ui button primary big fluid' in content
+        has_text = 'このお店を予約する' in content
+        available = has_button and has_text
 
-        print(f"  → アクティブボタン(予約可能): {'あり ✅' if has_active_button else 'なし ❌'}")
-        print(f"  → 無効ボタン(満席): {'あり ✅' if has_disabled_button else 'なし ❌'}")
+        print(f"  → 予約ボタン(aタグ): {'あり ✅' if has_button else 'なし ❌'}")
+        print(f"  → 「このお店を予約する」: {'あり ✅' if has_text else 'なし ❌'}")
 
         if available:
             print(f"  → 判定: ✅ 予約可能 ({name})")
-        elif has_disabled_button:
-            print(f"  → 判定: ❌ 満席 ({name})")
         else:
-            print(f"  → 判定: ⚠️ 判定不明 ({name})")
-            print(f"  → HTML全体({len(content)}文字)先頭2000文字:\n{content[:2000]}")
+            print(f"  → 判定: ❌ 満席 ({name})")
 
         return {"name": name, "url": url, "available": available}
 
@@ -102,7 +93,6 @@ async def main():
 
     notify_list = []
 
-    # curl_cffiでChrome指紋を偽装してCloudflareを回避
     async with AsyncSession(impersonate="chrome120") as session:
         for restaurant in restaurants:
             result = await check_restaurant(session, restaurant)
