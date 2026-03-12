@@ -113,7 +113,7 @@ async def main():
 
     notify_list = []
 
-    async with AsyncSession(impersonate="chrome124") as session:
+    async with AsyncSession(impersonate="chrome120") as session:
         for restaurant in restaurants:
             result = await check_restaurant(session, restaurant)
             if result["available"]:
