@@ -1,6 +1,8 @@
 import json
 import os
 import sys
+import functools
+print = functools.partial(print, flush=True)
 import asyncio
 from playwright.async_api import async_playwright
 
