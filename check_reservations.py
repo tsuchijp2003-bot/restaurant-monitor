@@ -10,6 +10,9 @@ RESTAURANT_URLS = os.environ.get("RESTAURANT_URLS", "[]")
 AVAILABLE_BUTTON = 'ui button primary big fluid'
 AVAILABLE_TEXT = "このお店を予約する"
 
+LOOP_COUNT = 12      # 12回チェック
+LOOP_INTERVAL = 300  # 5分おき
+
 
 def load_restaurants():
     return json.loads(RESTAURANT_URLS)
@@ -101,12 +104,8 @@ async def send_slack(name, url):
         print(f"Slack通知送信: {res.status} ({name})")
 
 
-async def main():
-    restaurants = load_restaurants()
-    if not restaurants:
-        print("⚠️ RESTAURANT_URLS が設定されていません")
-        sys.exit(1)
-
+async def run_check(restaurants):
+    """1回分のチェックを全店舗に対して実行"""
     notify_list = []
 
     async with async_playwright() as p:
@@ -116,7 +115,6 @@ async def main():
         )
 
         for restaurant in restaurants:
-            # URLごとに新しいコンテキストを作成してCloudflare対策
             context = await browser.new_context(
                 locale="ja-JP",
                 user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -130,14 +128,36 @@ async def main():
 
         await browser.close()
 
-    if notify_list:
-        if not SLACK_WEBHOOK_URL:
-            print("⚠️ SLACK_WEBHOOK_URL が設定されていません")
-            sys.exit(1)
-        for r in notify_list:
-            await send_slack(r["name"], r["url"])
-    else:
-        print("予約可能なレストランはありません")
+    return notify_list
+
+
+async def main():
+    restaurants = load_restaurants()
+    if not restaurants:
+        print("⚠️ RESTAURANT_URLS が設定されていません")
+        sys.exit(1)
+
+    for i in range(LOOP_COUNT):
+        now = i * LOOP_INTERVAL // 60
+        print(f"\n{'='*50}")
+        print(f"チェック {i+1}/{LOOP_COUNT} 回目（開始から約{now}分経過）")
+        print(f"{'='*50}")
+
+        notify_list = await run_check(restaurants)
+
+        if notify_list:
+            if not SLACK_WEBHOOK_URL:
+                print("⚠️ SLACK_WEBHOOK_URL が設定されていません")
+                sys.exit(1)
+            for r in notify_list:
+                await send_slack(r["name"], r["url"])
+        else:
+            print("予約可能なレストランはありません")
+
+        # 最後のループは待機不要
+        if i < LOOP_COUNT - 1:
+            print(f"\n⏳ {LOOP_INTERVAL // 60}分待機中...")
+            await asyncio.sleep(LOOP_INTERVAL)
 
 
 if __name__ == "__main__":
