@@ -38,12 +38,10 @@ jobs:
         run: |
           HOUR=$(TZ='Asia/Tokyo' date +%-H)
 
-          # 昼（8〜22時）は2回チェック、それ以外は1回
-          if [ "$HOUR" -ge 8 ] && [ "$HOUR" -lt 22 ]; then
+          
             LOOP=2
-          else
-            LOOP=1
-          fi
+            timeout-minutes: 360
+        
 
           for i in $(seq 1 $LOOP); do
             echo "===== チェック ${i}/${LOOP} 回目 ====="
