@@ -15,6 +15,7 @@ env:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 360
 
     steps:
       - name: リポジトリをチェックアウト
@@ -38,9 +39,9 @@ jobs:
         run: |
           HOUR=$(TZ='Asia/Tokyo' date +%-H)
 
-          
+      
             LOOP=3
-            timeout-minutes: 360
+          
         
 
           for i in $(seq 1 $LOOP); do
