@@ -2,8 +2,12 @@ name: 予約監視
 
 on:
   schedule:
-    - cron: "0 * * * *"
+    - cron: "0 * * * *"  # 毎時1回
   workflow_dispatch:
+
+concurrency:
+  group: reservation-check
+  cancel-in-progress: false  # 実行中のジョブはキャンセルせず、次をキューに入れる
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -31,4 +35,17 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           RESTAURANT_URLS: ${{ secrets.RESTAURANT_URLS }}
-        run: python check_reservations.py
+        run: |
+          HOUR=$(TZ='Asia/Tokyo' date +%-H)
+
+          # 昼（11〜13時）は2回チェック、それ以外は1回
+          if [ "$HOUR" -ge 11 ] && [ "$HOUR" -lt 14 ]; then
+            LOOP=2
+          else
+            LOOP=1
+          fi
+
+          for i in $(seq 1 $LOOP); do
+            echo "===== チェック ${i}/${LOOP} 回目 ====="
+            python check_reservations.py
+          done
