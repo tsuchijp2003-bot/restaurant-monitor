@@ -39,7 +39,7 @@ jobs:
           HOUR=$(TZ='Asia/Tokyo' date +%-H)
 
           
-            LOOP=2
+            LOOP=3
             timeout-minutes: 360
         
 
