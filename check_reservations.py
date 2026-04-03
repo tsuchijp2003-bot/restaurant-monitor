@@ -12,8 +12,8 @@ RESTAURANT_URLS = os.environ.get("RESTAURANT_URLS", "[]")
 AVAILABLE_BUTTON = 'ui button primary big fluid'
 AVAILABLE_TEXT = "このお店を予約する"
 
-LOOP_COUNT = 30      # 12回チェック
-LOOP_INTERVAL = 60  # 1分おき
+LOOP_COUNT = 360      # 12回チェック
+LOOP_INTERVAL = 1  # 1秒おき
 
 
 def load_restaurants():
