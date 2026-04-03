@@ -1,10 +1,13 @@
 import json
 import os
 import sys
-import functools
-print = functools.partial(print, flush=True)
 import asyncio
+import functools
+import time
 from playwright.async_api import async_playwright
+
+# 全printをリアルタイム出力に
+print = functools.partial(print, flush=True)
 
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
 RESTAURANT_URLS = os.environ.get("RESTAURANT_URLS", "[]")
@@ -12,8 +15,7 @@ RESTAURANT_URLS = os.environ.get("RESTAURANT_URLS", "[]")
 AVAILABLE_BUTTON = 'ui button primary big fluid'
 AVAILABLE_TEXT = "このお店を予約する"
 
-LOOP_COUNT = 360      # 12回チェック
-LOOP_INTERVAL = 1  # 1秒おき
+MAX_SECONDS = 6 * 60 * 60  # 6時間
 
 
 def load_restaurants():
@@ -25,44 +27,52 @@ def make_reservation_url(url):
     return url.rstrip("/") + "/reservations/new"
 
 
+def elapsed_str(start):
+    elapsed = int(time.time() - start)
+    h = elapsed // 3600
+    m = (elapsed % 3600) // 60
+    s = elapsed % 60
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+
 async def check_restaurant(page, restaurant):
     url = restaurant["url"]
     name = restaurant.get("name", url)
-    print(f"チェック中: {name} ({url})")
+    print(f"  チェック中: {name}")
 
     content = ""
     for attempt in range(3):
         try:
+            print(f"    → ページ読み込み開始... (試行{attempt+1}/3)")
             await page.goto(url, timeout=30000, wait_until="domcontentloaded")
             await page.wait_for_timeout(3000)
             content = await page.content()
+            print(f"    → HTML取得: {len(content)}文字")
             if len(content) > 10000:
                 break
-            print(f"  → HTML少なすぎ({len(content)}文字)、リトライ {attempt+1}/3...")
+            print(f"    → HTML少なすぎ、リトライ...")
             await asyncio.sleep(5)
         except Exception as e:
-            print(f"  → ⚠️ エラー(試行{attempt+1}): {e}")
+            print(f"    → ⚠️ エラー(試行{attempt+1}): {e}")
             await asyncio.sleep(5)
-
-    print(f"  → HTML取得: {len(content)}文字")
 
     for label, text in [("予約可能テキスト", AVAILABLE_TEXT), ("予約ボタンクラス", AVAILABLE_BUTTON)]:
         idx = content.find(text)
         if idx != -1:
             start = max(0, idx - 100)
             end = min(len(content), idx + len(text) + 100)
-            print(f"  → [{label}] の前後:\n{content[start:end]}\n")
+            print(f"    → [{label}] の前後:\n{content[start:end]}\n")
         else:
-            print(f"  → [{label}]: 見つかりませんでした")
+            print(f"    → [{label}]: 見つかりませんでした")
 
     has_button = AVAILABLE_BUTTON in content
     has_text = AVAILABLE_TEXT in content
     available = has_button and has_text
 
     if available:
-        print(f"  → 判定: ✅ 予約可能 ({name})")
+        print(f"    → 判定: ✅ 予約可能")
     else:
-        print(f"  → 判定: ❌ 満席 ({name})")
+        print(f"    → 判定: ❌ 満席")
 
     return {"name": name, "url": url, "available": available}
 
@@ -103,11 +113,10 @@ async def send_slack(name, url):
         method="POST"
     )
     with urllib.request.urlopen(req) as res:
-        print(f"Slack通知送信: {res.status} ({name})")
+        print(f"  Slack通知送信: {res.status} ({name})")
 
 
 async def run_check(restaurants):
-    """1回分のチェックを全店舗に対して実行"""
     notify_list = []
 
     async with async_playwright() as p:
@@ -139,10 +148,16 @@ async def main():
         print("⚠️ RESTAURANT_URLS が設定されていません")
         sys.exit(1)
 
-    for i in range(LOOP_COUNT):
-        now = i * LOOP_INTERVAL // 60
+    print(f"監視対象: {len(restaurants)}店舗")
+    print(f"最大実行時間: {MAX_SECONDS // 3600}時間")
+
+    start_time = time.time()
+    loop_count = 0
+
+    while time.time() - start_time < MAX_SECONDS:
+        loop_count += 1
         print(f"\n{'='*50}")
-        print(f"チェック {i+1}/{LOOP_COUNT} 回目（開始から約{now}分経過）")
+        print(f"チェック {loop_count} 回目 [経過時間: {elapsed_str(start_time)}]")
         print(f"{'='*50}")
 
         notify_list = await run_check(restaurants)
@@ -154,12 +169,9 @@ async def main():
             for r in notify_list:
                 await send_slack(r["name"], r["url"])
         else:
-            print("予約可能なレストランはありません")
+            print(f"→ 予約可能なレストランはありません [経過時間: {elapsed_str(start_time)}]")
 
-        # 最後のループは待機不要
-        if i < LOOP_COUNT - 1:
-            print(f"\n⏳ {LOOP_INTERVAL // 60}分待機中...")
-            await asyncio.sleep(LOOP_INTERVAL)
+    print(f"\n✅ 全チェック完了 [合計{loop_count}回 / 経過時間: {elapsed_str(start_time)}]")
 
 
 if __name__ == "__main__":
