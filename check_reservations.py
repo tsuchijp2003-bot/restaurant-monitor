@@ -13,7 +13,7 @@ AVAILABLE_BUTTON = 'ui button primary big fluid'
 AVAILABLE_TEXT = "このお店を予約する"
 
 LOOP_COUNT = 30      # 12回チェック
-LOOP_INTERVAL = 120  # 5分おき
+LOOP_INTERVAL = 60  # 1分おき
 
 
 def load_restaurants():
